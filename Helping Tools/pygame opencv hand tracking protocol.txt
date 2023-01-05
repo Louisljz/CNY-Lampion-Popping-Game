@@ -1,0 +1,9 @@
+read
+cv2.flip (1)
+findhands with fliptype
+process
+np.rot90
+np.flip (0)
+cvtColor RGB
+pygame makesurface
+blit
