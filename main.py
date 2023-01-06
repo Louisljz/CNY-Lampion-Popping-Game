@@ -57,6 +57,7 @@ font1_100 = pygame.font.Font(os.path.join(fonts_path, 'aAsianNinja.ttf'), 100)
 font1_70 = pygame.font.Font(os.path.join(fonts_path, 'aAsianNinja.ttf'), 70)
 font2_50 = pygame.font.Font(os.path.join(fonts_path, 'go3v2.ttf'), 50)
 font2_100 = pygame.font.Font(os.path.join(fonts_path, 'go3v2.ttf'), 100)
+leaderboard_font = pygame.font.Font(os.path.join(fonts_path, 'AgencyFB-Bold.ttf'), 50)
 
 # Load Images
 home_path = os.path.join(images_path, 'Home/')
@@ -68,6 +69,7 @@ cursor = pygame.image.load(os.path.join(images_path, 'cursor.png')).convert_alph
 # Home Screen Images
 homeBG = pygame.image.load(os.path.join(home_path, 'homeBG.jpg')).convert()
 board = pygame.image.load(os.path.join(home_path, 'bulletin_board.png')).convert_alpha()
+leaderboard_frame = pygame.image.load(os.path.join(home_path, 'leaderboard_frame.png')).convert_alpha()
 
 playBtn = pygame.image.load(os.path.join(home_path, 'playBtn.png')).convert_alpha()
 playBtnRect = playBtn.get_rect()
@@ -211,9 +213,9 @@ buttonList.append(Button((x,y), 'Enter', (w,h)))
 def get_leaderboard():
     db = pd.read_csv(database)
     db = db.sort_values(by='score', ascending=False)
-    if len(db) > 10:
-        names = db['name'][:10].to_numpy()
-        scores = db['score'][:10].to_numpy()
+    if len(db) > 5:
+        names = db['name'][:5].to_numpy()
+        scores = db['score'][:5].to_numpy()
     else:
         names = db['name'].to_numpy()
         scores = db['score'].to_numpy()
@@ -237,17 +239,21 @@ class SceneManager:
         window.blit(homeBG, (0,0))
         window.blit(playBtn, playBtnRect)
         window.blit(board, (50, 575))
+        window.blit(leaderboard_frame, (650, 100))
 
         title = font1_100.render('CNY Lampion Popping Game', True, 
-                            (153, 52, 65), (255, 184, 177))
+                            (255, 255, 255))
         window.blit(title, (100, 20))
+
+        leaderboard_title = leaderboard_font.render('LEADERBOARD', True, (255,255,0))
+        window.blit(leaderboard_title, (815, 225))
 
         # Display the Database
         length = len(self.names)
         for i in range(length):
-            text = font2_50.render(f'{i+1}. {self.names[i]}: {self.scores[i]}',
-                                    True, (153, 52, 65), (255, 184, 177))
-            window.blit(text, (800, i * 55 + 150))
+            text = leaderboard_font.render(f'{i+1}. {self.names[i]}: {self.scores[i]}',
+                                    True, (255,255,0))
+            window.blit(text, (825, i * 55 + 300))
         
         # Detect Hand from Webcam
         _, img = cap.read()
