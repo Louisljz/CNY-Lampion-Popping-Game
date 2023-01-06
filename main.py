@@ -6,6 +6,7 @@ import time
 import random
 import os
 import sys
+import pandas as pd
 
 # Initialize and Create Window
 pygame.init()
@@ -26,7 +27,7 @@ else:
 
 # Load Resources
 resources_path = os.path.join(folder_path, 'Resources/')
-database = os.path.join(resources_path, 'best_score.txt')
+database = os.path.join(resources_path, 'database.csv')
 
 bgmusic_path = os.path.join(resources_path, 'BG Music/')
 sfx_path = os.path.join(resources_path, 'SFX/')
@@ -207,6 +208,18 @@ buttonList.append(Button((x,y), 'Backspace', (w,h)))
 x, y, w, h = 850, 350, 290, 85
 buttonList.append(Button((x,y), 'Enter', (w,h)))
 
+def get_leaderboard():
+    db = pd.read_csv(database)
+    db = db.sort_values(by='score', ascending=False)
+    if len(db) > 10:
+        names = db['name'][:10].to_numpy()
+        scores = db['score'][:10].to_numpy()
+    else:
+        names = db['name'].to_numpy()
+        scores = db['score'].to_numpy()
+
+    return names, scores
+
 # Scene Manager
 class SceneManager:
     def __init__(self, duration = 30, initial_speed = 5, increase_speed=0.35):
@@ -216,10 +229,8 @@ class SceneManager:
         # variable for changing scenes
         self.state = 'home' 
         # At first launch of the App
-        # Get Best Score and Name from database
-        file = open(database, 'r')
-        self.best_name, self.best_score = file.readlines()
-        file.close()
+        # Get top 10 names and scores from database
+        self.names, self.scores = get_leaderboard()
 
     def displayHomeScreen(self):
         # Display UI
@@ -232,15 +243,11 @@ class SceneManager:
         window.blit(title, (100, 20))
 
         # Display the Database
-        best_name1 = font2_50.render(f'Best Scorer Is:', True, (153, 52, 65), (255, 184, 177))
-        best_name2 = font2_50.render(self.best_name.replace('\n', ''), True, (153, 52, 65), (255, 184, 177))
-        best_score1 = font2_50.render(f'Score to Beat:', True, (153, 52, 65), (255, 184, 177))
-        best_score2 = font2_50.render(self.best_score, True, (153, 52, 65), (255, 184, 177))
-
-        window.blit(best_name1, (850, 300))
-        window.blit(best_name2, (930, 350))
-        window.blit(best_score1, (850, 400))
-        window.blit(best_score2, (1000, 450))
+        length = len(self.names)
+        for i in range(length):
+            text = font2_50.render(f'{i+1}. {self.names[i]}: {self.scores[i]}',
+                                    True, (153, 52, 65), (255, 184, 177))
+            window.blit(text, (800, i * 55 + 150))
         
         # Detect Hand from Webcam
         _, img = cap.read()
@@ -454,10 +461,8 @@ class SceneManager:
                                                 (self.middleX, self.middleY))[0]
                     
                     if distance < 45:
-                        # Get Best Score and Name from database
-                        file = open(database, 'r')
-                        self.best_name, self.best_score = file.readlines()
-                        file.close()
+                        # Get top 10 names and scores from database
+                        self.names, self.scores = get_leaderboard()
                         # Change to Home Scene
                         self.state = 'home' 
                         pygame.mixer.stop()
@@ -485,6 +490,14 @@ class SceneManager:
         hands = detector.findHands(img, flipType=False, draw=False)
 
         # Displaying Text Entry
+        if len(self.finalText) > 8:
+            max = True
+            warning = font2_100.render('Maximum Word Number Reached: 8',
+                                        True, (255,0,0), (255,255,255))
+            window.blit(warning, (100, 500))
+        else:
+            max = False
+
         pygame.draw.rect(window, (175, 0, 175), (50, 350, 650, 100))
         nametext = font2_100.render(self.finalText, True, (255, 255, 255))
         window.blit(nametext, (60, 335))
@@ -537,10 +550,8 @@ class SceneManager:
                                     file.write(self.finalText + '\n' + str(self.score))
                                     file.close()
                                 
-                                # Get Best Score and Name from database
-                                file = open(database, 'r')
-                                self.best_name, self.best_score = file.readlines()
-                                file.close()
+                                # Get top 10 names and scores from database
+                                self.names, self.scores = get_leaderboard()
                                 
                                 # Change to Home Scene
                                 self.state = 'home' 
@@ -548,7 +559,8 @@ class SceneManager:
                                 homeMusic.play(-1) 
                                 return
                             else:
-                                self.finalText += button.text # Adds Letter
+                                if not max:
+                                    self.finalText += button.text # Adds Letter
 
                 # Display cursor on both fingers
                 window.blit(cursor, (teachX-25, teachY-40))
