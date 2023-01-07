@@ -80,6 +80,7 @@ playBtnRect.y = height/2 - 200
 gameBG = pygame.image.load(os.path.join(game_path, 'gameBG.jpg')).convert()
 dart = pygame.image.load(os.path.join(game_path, 'dart.png')).convert_alpha()
 pop_sprite = pygame.image.load(os.path.join(game_path, 'pop.png')).convert_alpha()
+bonus_pop = pygame.image.load(os.path.join(game_path, 'bonus_pop.png')).convert_alpha()
 
 # Lampions
 lampion1 = pygame.image.load(os.path.join(game_path, 'lampion1.png')).convert_alpha()
@@ -131,12 +132,12 @@ textInput_rect.y = 70
 
 backbtn = pygame.image.load(os.path.join(end_path, 'back.png')).convert_alpha()
 backbtn_rect = backbtn.get_rect()
-backbtn_rect.x = 200
+backbtn_rect.x = width-350
 backbtn_rect.y = 70
 
 quitbtn = pygame.image.load(os.path.join(end_path, 'quit.png')).convert_alpha()
 quitbtn_rect = quitbtn.get_rect()
-quitbtn_rect.x = width-350
+quitbtn_rect.x = 200
 quitbtn_rect.y = 70
 
 
@@ -214,8 +215,8 @@ def get_leaderboard():
     db = pd.read_csv(database)
     db = db.sort_values(by='score', ascending=False)
     if len(db) > 5:
-        names = db['name'][:5].to_numpy()
-        scores = db['score'][:5].to_numpy()
+        names = db['name'].iloc[:5].to_numpy()
+        scores = db['score'].iloc[:5].to_numpy()
     else:
         names = db['name'].to_numpy()
         scores = db['score'].to_numpy()
@@ -278,7 +279,7 @@ class SceneManager:
                     distance = detector.findDistance((teachX, teachY), 
                                                 (middleX, middleY))[0]
                     
-                    if distance < 45: # Clicked..
+                    if distance < 50: # Clicked..
                         # Reset Variables
                         self.start = time.time() 
                         self.score = 0 
@@ -299,17 +300,15 @@ class SceneManager:
         timeLeft = round(self.duration - (timeNow - self.start))
 
         if timeLeft == 0:
-            # Bcz TextInput Button only appears if Record is Broken, 
-            # So to prevent UnboundLocalError, we need to assign the --
-            # particular variables a value at the begining.
-            self.fingersUp = False 
-            self.teachX, self.teachY = 0, 0
-            self.middleX, self.middleY = 0, 0
+            # Get top 10 names and scores from database
+            self.scores = get_leaderboard()[1]
 
-            # Get Previous Best Score from Second Line of Database
-            file = open(database, 'r')
-            self.prev_best = file.readlines()[1]
-            file.close()
+            # Keep Name Unwritten First, Only Write Score
+            # Add user data to csv file
+            db = pd.read_csv(database)
+            row = pd.Series({'name': 'Unknown', 'score': self.score})
+            new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
+            new_db.to_csv(database, index=False)
 
             # Display End Screen
             self.state = 'end' 
@@ -343,7 +342,7 @@ class SceneManager:
                             if rect.collidepoint(x, y): # Check for collision
                                 # Play SFX and animation
                                 pop_sfx.play()
-                                window.blit(pop_sprite, (x-100, y-75))
+                                window.blit(bonus_pop, (x-100, y-75))
                                 reset_lampions(keyRect, height*4)
                                 self.speed += self.increase_speed
                                 self.score += 10
@@ -394,6 +393,8 @@ class SceneManager:
         window.blit(endBG, (0,0))
         window.blit(backbtn, backbtn_rect)
         window.blit(quitbtn, quitbtn_rect)
+        # Display Button to Enter Name Screen
+        window.blit(textInput, textInput_rect)
 
         # Display Text Messages
         finalScore = font2_100.render(f'Final Score: {self.score}', True, (255,255,255))
@@ -406,8 +407,12 @@ class SceneManager:
         window.blit(finalScore, (300, 350))
         window.blit(message, (350, 275))
 
-        window.blit(back_message, (230, 30))
-        window.blit(quit_message, (width-320, 30))
+        window.blit(back_message, (width-320, 30))
+        window.blit(quit_message, (230, 30))
+
+        notify_message = font1_70.render('Enter your name by Clicking button on Top!',
+                                True, (153, 52, 65), (255, 184, 177))
+        window.blit(notify_message, (10, 635))
 
         # Detect Hand from Webcam
         _, img = cap.read()
@@ -415,37 +420,27 @@ class SceneManager:
         hands = detector.findHands(img, flipType=False, draw=False)
 
         # If Record broken
-        if self.score > int(self.prev_best): 
-            file = open(database, 'w')
-            # Keep Name Unwritten First, Only Write Score
-            file.write('Unknown' + '\n' + str(self.score))
-            file.close()
+        if self.scores.size > 0:
+            if self.score > int(self.scores[0]): 
+                # Display Messages
+                congrats_message = font1_70.render('Congratz! You have broken a new Record!', 
+                                                True, (153, 52, 65), (255, 184, 177))
+                prevbest_message = font1_70.render(f'Previous Best Score: {self.scores[0]}',
+                                                True, (153, 52, 65), (255, 184, 177))
 
-            # Display Messages
-            congrats_message = font1_70.render('Congratz! You have broken a new Record!', 
-                                            True, (153, 52, 65), (255, 184, 177))
-            prevbest_message = font1_70.render(f'Previous Best Score: {self.prev_best}',
-                                            True, (153, 52, 65), (255, 184, 177))
-            notify_message = font1_70.render('Enter your name by Clicking button on Top!',
-                                            True, (153, 52, 65), (255, 184, 177))
+                window.blit(congrats_message, (50, 485))
+                window.blit(prevbest_message, (320, 560))
 
-            window.blit(congrats_message, (50, 485))
-            window.blit(prevbest_message, (320, 560))
-            window.blit(notify_message, (10, 635))
-            # Display Button to Enter Name Screen
-            window.blit(textInput, textInput_rect)
+        else:
+            if self.score > 0: 
+                # Display Messages
+                congrats_message = font1_70.render('Congratz! You have broken a new Record!', 
+                                                True, (153, 52, 65), (255, 184, 177))
+                prevbest_message = font1_70.render(f'Previous Best Score: 0',
+                                                True, (153, 52, 65), (255, 184, 177))
 
-            if self.fingersUp == True:
-                # If hand collides with TextInput Button
-                if textInput_rect.collidepoint(self.teachX, self.teachY):
-                    distance = detector.findDistance((self.teachX, self.teachY), 
-                                                (self.middleX, self.middleY))[0]
-                    
-                    if distance < 45:
-                        self.clicked = False # To avoid spam clicks on each key
-                        self.finalText = '' # Reset Name
-                        # Change to Name Scene
-                        self.state = 'name'
+                window.blit(congrats_message, (50, 485))
+                window.blit(prevbest_message, (320, 560))
 
         if hands:
             hand = hands[0]
@@ -453,20 +448,19 @@ class SceneManager:
             fingers = detector.fingersUp(hand) 
             # If teach and middle fingers are raised up..
             if fingers[1] == 1 and fingers[2] == 1:
-                self.fingersUp = True
-                self.teachX, self.teachY = lmList[8][0:2] 
-                self.middleX, self.middleY = lmList[12][0:2]
+                teachX, teachY = lmList[8][0:2] 
+                middleX, middleY = lmList[12][0:2]
 
                 # Display cursor on both fingers
-                window.blit(cursor, (self.teachX-25, self.teachY-40))
-                window.blit(cursor, (self.middleX-25, self.middleY-40))
+                window.blit(cursor, (teachX-25, teachY-40))
+                window.blit(cursor, (middleX-25, middleY-40))
 
                 # and if the teach finger collides with the back button..
-                if backbtn_rect.collidepoint(self.teachX, self.teachY):
-                    distance = detector.findDistance((self.teachX, self.teachY), 
-                                                (self.middleX, self.middleY))[0]
+                if backbtn_rect.collidepoint(teachX, teachY):
+                    distance = detector.findDistance((teachX, teachY), 
+                                                (middleX, middleY))[0]
                     
-                    if distance < 45:
+                    if distance < 50:
                         # Get top 10 names and scores from database
                         self.names, self.scores = get_leaderboard()
                         # Change to Home Scene
@@ -476,16 +470,25 @@ class SceneManager:
                         return
                 
                 # or the teach finger collides with the quit button..
-                elif quitbtn_rect.collidepoint(self.teachX, self.teachY):
-                    distance = detector.findDistance((self.teachX, self.teachY), 
-                                                (self.middleX, self.middleY))[0]
+                elif quitbtn_rect.collidepoint(teachX, teachY):
+                    distance = detector.findDistance((teachX, teachY), 
+                                                (middleX, middleY))[0]
                     
-                    if distance < 45:
+                    if distance < 50:
                         # Closes the Game
                         pygame.quit() 
                         sys.exit()
-            else:
-                self.fingersUp = False
+
+                # Or if hand collides with TextInput Button
+                elif textInput_rect.collidepoint(teachX, teachY):
+                    distance = detector.findDistance((teachX, teachY), 
+                                                (middleX, middleY))[0]
+                    
+                    if distance < 50:
+                        self.clicked = False # To avoid spam clicks on each key
+                        self.finalText = '' # Reset Name
+                        # Change to Name Scene
+                        self.state = 'name'
 
     def displayNameScreen(self):
         # Display BG
@@ -539,10 +542,10 @@ class SceneManager:
                         distance = detector.findDistance((teachX, teachY), (middleX, middleY))[0]
 
                         # To avoid spam clicks, by checking whether the fingers are apart, after every click
-                        if distance > 45 and self.clicked == True:
+                        if distance > 50 and self.clicked == True:
                             self.clicked = False
 
-                        if distance < 45 and self.clicked == False:
+                        if distance < 50 and self.clicked == False:
                             self.clicked = True
                             # Delete last letter if backspace key is clicked
                             if button.text == 'Backspace':
@@ -551,10 +554,12 @@ class SceneManager:
                             elif button.text == 'Enter':
                                 if self.finalText != '':
                                     # Only Write Name if Entered By user
-                                    file = open(database, 'w')
-                                    # Write name and score in file
-                                    file.write(self.finalText + '\n' + str(self.score))
-                                    file.close()
+                                    # Add user data to csv file
+                                    db = pd.read_csv(database)
+                                    db = db.drop(len(db)-1)
+                                    row = pd.Series({'name': self.finalText, 'score': self.score})
+                                    new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
+                                    new_db.to_csv(database, index=False)
                                 
                                 # Get top 10 names and scores from database
                                 self.names, self.scores = get_leaderboard()
@@ -564,6 +569,7 @@ class SceneManager:
                                 pygame.mixer.stop()
                                 homeMusic.play(-1) 
                                 return
+                            
                             else:
                                 if not max:
                                     self.finalText += button.text # Adds Letter
@@ -582,7 +588,7 @@ class SceneManager:
         else: # state is name
             self.displayNameScreen()
 
-scene_manager = SceneManager()
+scene_manager = SceneManager(duration=10)
 homeMusic.play(-1)
 
 # Mainloop  
