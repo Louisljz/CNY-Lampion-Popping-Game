@@ -7,6 +7,7 @@ import random
 import os
 import sys
 import pandas as pd
+import numpy as np
 
 # Initialize and Create Window
 pygame.init()
@@ -34,23 +35,21 @@ sfx_path = os.path.join(resources_path, 'SFX/')
 fonts_path = os.path.join(resources_path, 'Fonts/')
 images_path = os.path.join(resources_path, 'Images/')
 
-# Set App Icon
-icon = pygame.image.load(os.path.join(images_path, 'app-icon.png')).convert_alpha()
-pygame.display.set_icon(icon)
-
 # Load BG Music
 homeMusic = pygame.mixer.Sound(os.path.join(bgmusic_path, 'homeMusic.mp3'))
-homeMusic.set_volume(0.1)
+homeMusic.set_volume(0.5)
 gameMusic = pygame.mixer.Sound(os.path.join(bgmusic_path, 'gameMusic.mp3'))
-gameMusic.set_volume(0.1)
+gameMusic.set_volume(0.5)
 endMusic = pygame.mixer.Sound(os.path.join(bgmusic_path, 'endMusic.mp3'))
-endMusic.set_volume(0.1)
+endMusic.set_volume(0.5)
 
 # Load Sound Effects
 pop_sfx = pygame.mixer.Sound(os.path.join(sfx_path, 'pop.mp3'))
 pop_sfx.set_volume(1)
 transition = pygame.mixer.Sound(os.path.join(sfx_path, 'transition.mp3'))
 transition.set_volume(1)
+boom = pygame.mixer.Sound(os.path.join(sfx_path, 'boom.mp3'))
+boom.set_volume(1)
 
 # Load Fonts
 font1_100 = pygame.font.Font(os.path.join(fonts_path, 'aAsianNinja.ttf'), 100)
@@ -64,6 +63,11 @@ home_path = os.path.join(images_path, 'Home/')
 game_path = os.path.join(images_path, 'Game/')
 end_path = os.path.join(images_path, 'End/')
 
+# Set App Icon
+icon = pygame.image.load(os.path.join(images_path, 'app-icon.png')).convert_alpha()
+pygame.display.set_icon(icon)
+
+# Set Cursor
 cursor = pygame.image.load(os.path.join(images_path, 'cursor.png')).convert_alpha()
 
 # Home Screen Images
@@ -125,19 +129,14 @@ curtainsRightRect.y = 0
 endBG = pygame.image.load(os.path.join(end_path, 'EndBG.png')).convert()
 textFrame = pygame.image.load(os.path.join(end_path, 'textFrame.png')).convert_alpha()
 
-textInput = pygame.image.load(os.path.join(end_path, 'textInput.png')).convert_alpha()
-textInput_rect = textInput.get_rect()
-textInput_rect.x = 350
-textInput_rect.y = 70
-
 backbtn = pygame.image.load(os.path.join(end_path, 'back.png')).convert_alpha()
 backbtn_rect = backbtn.get_rect()
-backbtn_rect.x = width-350
+backbtn_rect.x = 200
 backbtn_rect.y = 70
 
 quitbtn = pygame.image.load(os.path.join(end_path, 'quit.png')).convert_alpha()
 quitbtn_rect = quitbtn.get_rect()
-quitbtn_rect.x = 200
+quitbtn_rect.x = width-350
 quitbtn_rect.y = 70
 
 
@@ -211,6 +210,20 @@ buttonList.append(Button((x,y), 'Backspace', (w,h)))
 x, y, w, h = 850, 350, 290, 85
 buttonList.append(Button((x,y), 'Enter', (w,h)))
 
+# Draw all keyboard buttons
+def drawKeys():
+    # Special for Unused Key
+    x, y, w, h = 950, 150, 85, 85
+    pygame.draw.rect(window, (255, 0, 255), (x, y, w, h))
+    for button in buttonList:
+        x, y = button.pos
+        w, h = button.size
+
+        pygame.draw.rect(window, (255, 0, 255), (x, y, w, h))
+        letter = font2_50.render(button.text, True, (255, 255, 255))
+        window.blit(letter, (x + 20, y + 30))
+
+# Read database, get top 5 highest score.
 def get_leaderboard():
     db = pd.read_csv(database)
     db = db.sort_values(by='score', ascending=False)
@@ -223,6 +236,13 @@ def get_leaderboard():
 
     return names, scores
 
+# Write score data to CSV file
+def write_score(name, score):
+    db = pd.read_csv(database)
+    row = pd.Series({'name': name, 'score': score})
+    new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
+    new_db.to_csv(database, index=False)
+
 # Scene Manager
 class SceneManager:
     def __init__(self, duration = 30, initial_speed = 5, increase_speed=0.35):
@@ -231,9 +251,8 @@ class SceneManager:
         self.increase_speed = increase_speed
         # variable for changing scenes
         self.state = 'home' 
-        # At first launch of the App
-        # Get top 10 names and scores from database
         self.names, self.scores = get_leaderboard()
+        self.counter = 0 # Wait for 3 seconds to click
 
     def displayHomeScreen(self):
         # Display UI
@@ -250,8 +269,7 @@ class SceneManager:
         window.blit(leaderboard_title, (815, 225))
 
         # Display the Database
-        length = len(self.names)
-        for i in range(length):
+        for i in range(len(self.names)):
             text = leaderboard_font.render(f'{i+1}. {self.names[i]}: {self.scores[i]}',
                                     True, (255,255,0))
             window.blit(text, (825, i * 55 + 300))
@@ -266,50 +284,112 @@ class SceneManager:
             lmList = hand['lmList']
             fingers = detector.fingersUp(hand) 
 
-            # If teach and middle fingers are raised up..
-            if fingers[1] == 1 and fingers[2] == 1:
-                # Get X, Y coordinate of the end points of each finger
+            # If teach finger is up..
+            if fingers[1] == 1:
+                # Get X, Y coordinate of the end point of teach finger
                 teachX, teachY = lmList[8][0:2] 
-                middleX, middleY = lmList[12][0:2]
-                # Display cursor on both fingers
-                window.blit(cursor, (teachX-25, teachY-40))
-                window.blit(cursor, (middleX-25, middleY-40))
+                # Display cursor
+                window.blit(cursor, (teachX-25, teachY-30))
                 # and if the teach finger collides with the button..
                 if playBtnRect.collidepoint(teachX, teachY):
-                    distance = detector.findDistance((teachX, teachY), 
-                                                (middleX, middleY))[0]
-                    
-                    if distance < 50: # Clicked..
-                        # Reset Variables
-                        self.start = time.time() 
-                        self.score = 0 
-                        self.speed = self.initial_speed
-                        # Reset Initial Position of Lampions
-                        position_lampions()
-                        # Reset Curtains' Location
-                        curtainsLeftRect.x = 0
-                        curtainsRightRect.x = width - 515
-                        # Change to Game Scene
-                        self.state = 'game' 
-                        pygame.mixer.stop()
-                        transition.play(0)
-                        gameMusic.play(-1)
+                    self.counter += 1
+                    if self.counter == 40: # Almost 2 seconds
+                        self.counter = 0
+                        self.nameText = ''
+                        self.state = 'name'
+
+                else:
+                    self.counter = 0
+    
+    def displayNameScreen(self):
+        # Display BG
+        window.blit(homeBG, (0,0))
+        # Detect Hand from Webcam
+        _, img = cap.read()
+        img = cv2.flip(img, 1)
+        hands = detector.findHands(img, flipType=False, draw=False)
+
+        # Set Char limit for Name
+        if len(self.nameText) > 8:
+            max = True
+            warning = font1_70.render('Maximum Word Number Reached: 8',
+                                        True, (255,0,0), (255,255,255))
+            window.blit(warning, (100, 500))
+        else:
+            max = False
         
+        # Make Sure Name is not Blank
+        if len(self.nameText) == 0:
+            warning = font1_70.render("Don't Leave your name Blank!",
+                                                                True, (255,0,0), (255,255,255))
+            window.blit(warning, (100, 500))
+        
+        # Displaying Name Entry
+        pygame.draw.rect(window, (175, 0, 175), (50, 350, 650, 100))
+        nameEntry = font2_100.render(self.nameText, True, (255, 255, 255))
+        window.blit(nameEntry, (60, 335))
+        
+        if hands:  
+            hand = hands[0]
+            lmList = hand['lmList']
+            fingers = detector.fingersUp(hand) 
+            # If teach finger is up..
+            if fingers[1] == 1:
+                # Get X, Y coordinate of the end point of teach finger
+                teachX, teachY = lmList[8][0:2] 
+                drawKeys() # Draw all keyboard buttons
+                for button in buttonList:
+                    x, y = button.pos
+                    w, h = button.size
+                    # If button key collides with end of teach finger
+                    if button.getRect().collidepoint(teachX, teachY):
+                        # Display Hover Animation
+                        pygame.draw.rect(window, (175, 0, 175), (x, y, w, h))
+                        letter = font2_50.render(button.text, True, (255, 255, 255))
+                        window.blit(letter, (x + 20, y + 30))
+                     
+                        self.counter += 1
+                        if self.counter == 30: # 1 Second
+                            self.counter = 0
+                            # Delete last letter if backspace key is clicked
+                            if button.text == 'Backspace':
+                                self.nameText = self.nameText[:-1]
+                            
+                            # Enter Game Screen if Enter Key is Clicked
+                            elif button.text == 'Enter':
+                                if self.nameText != '':
+                                    # Reset Variables
+                                    self.start = time.time() 
+                                    self.score = 0 
+                                    self.speed = self.initial_speed
+                                    # Reset Initial Position of Lampions
+                                    position_lampions()
+                                    # Reset Curtains' Location
+                                    curtainsLeftRect.x = 0
+                                    curtainsRightRect.x = width - 515
+                                    # Change to Game Scene
+                                    self.state = 'game' 
+                                    pygame.mixer.stop()
+                                    transition.play(0)
+                                    gameMusic.play(-1)
+
+                            else:
+                                if not max:
+                                    self.nameText += button.text # Adds Letter
+                        break
+                            
+                else:
+                    self.counter = 0
+                
+                # Display cursor
+                window.blit(cursor, (teachX-25, teachY-30))
+
     def displayGameScreen(self):
         timeNow = time.time()
         timeLeft = round(self.duration - (timeNow - self.start))
 
         if timeLeft == 0:
-            # Get top 10 names and scores from database
-            self.scores = get_leaderboard()[1]
-
-            # Keep Name Unwritten First, Only Write Score
-            # Add user data to csv file
-            db = pd.read_csv(database)
-            row = pd.Series({'name': 'Unknown', 'score': self.score})
-            new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
-            new_db.to_csv(database, index=False)
-
+            write_score(self.nameText, self.score)
             # Display End Screen
             self.state = 'end' 
             pygame.mixer.stop()
@@ -331,7 +411,7 @@ class SceneManager:
                 if fingers[1] == 1: # If teach finger is Up..
                     # Display Dart UI on the end of teach finger
                     x, y = hand['lmList'][8][0:2]
-                    window.blit(dart, (x-80, y-75))
+                    window.blit(dart, (x-75, y-75))
 
             # Move and Display Lampions
             for image, keyRect in zip(lampion_images.values(), lampion_rects.keys()):
@@ -341,15 +421,16 @@ class SceneManager:
                         if x and y:
                             if rect.collidepoint(x, y): # Check for collision
                                 # Play SFX and animation
-                                pop_sfx.play()
+                                boom.play()
                                 window.blit(bonus_pop, (x-100, y-75))
                                 reset_lampions(keyRect, height*4)
                                 self.speed += self.increase_speed
                                 self.score += 10
                         
                         if rect.y < 0: # Reset Lampion if it's out of frame
-                            reset_lampions(keyRect, height*4)
-                    
+                            # So special lampion show up less often
+                            reset_lampions(keyRect, height*4) 
+
                         rect.y -= self.speed
                         window.blit(image, rect)
                 
@@ -393,26 +474,20 @@ class SceneManager:
         window.blit(endBG, (0,0))
         window.blit(backbtn, backbtn_rect)
         window.blit(quitbtn, quitbtn_rect)
-        # Display Button to Enter Name Screen
-        window.blit(textInput, textInput_rect)
 
         # Display Text Messages
-        finalScore = font2_100.render(f'Final Score: {self.score}', True, (255,255,255))
-        message = font2_100.render(r"TIME'S UP!", True, (255,255,255))
-
         back_message = font2_50.render('BACK', True, (255,255,255))
         quit_message = font2_50.render('QUIT', True, (255,255,255))
+
+        window.blit(back_message, (230, 30))
+        window.blit(quit_message, (width-320, 30))
+
+        finalScore = font2_100.render(f'Your Score: {self.score}', True, (255,255,255))
+        message = font2_100.render(r"TIME'S UP!", True, (255,255,255))
 
         window.blit(textFrame, (20, 225))
         window.blit(finalScore, (300, 350))
         window.blit(message, (350, 275))
-
-        window.blit(back_message, (width-320, 30))
-        window.blit(quit_message, (230, 30))
-
-        notify_message = font1_70.render('Enter your name by Clicking button on Top!',
-                                True, (153, 52, 65), (255, 184, 177))
-        window.blit(notify_message, (10, 635))
 
         # Detect Hand from Webcam
         _, img = cap.read()
@@ -421,47 +496,42 @@ class SceneManager:
 
         # If Record broken
         if self.scores.size > 0:
-            if self.score > int(self.scores[0]): 
+            prev_best = self.scores[0]
+            if self.score > int(prev_best): 
                 # Display Messages
                 congrats_message = font1_70.render('Congratz! You have broken a new Record!', 
                                                 True, (153, 52, 65), (255, 184, 177))
-                prevbest_message = font1_70.render(f'Previous Best Score: {self.scores[0]}',
+                prevbest_message = font1_70.render(f'Previous Best Score: {prev_best}',
                                                 True, (153, 52, 65), (255, 184, 177))
 
                 window.blit(congrats_message, (50, 485))
                 window.blit(prevbest_message, (320, 560))
 
+        # For First Player Only
         else:
             if self.score > 0: 
                 # Display Messages
                 congrats_message = font1_70.render('Congratz! You have broken a new Record!', 
                                                 True, (153, 52, 65), (255, 184, 177))
-                prevbest_message = font1_70.render(f'Previous Best Score: 0',
-                                                True, (153, 52, 65), (255, 184, 177))
 
                 window.blit(congrats_message, (50, 485))
-                window.blit(prevbest_message, (320, 560))
 
         if hands:
             hand = hands[0]
             lmList = hand['lmList']
             fingers = detector.fingersUp(hand) 
-            # If teach and middle fingers are raised up..
-            if fingers[1] == 1 and fingers[2] == 1:
+            # If teach finger is up..
+            if fingers[1] == 1:
+                # Get X, Y coordinate of the end point of teach finger
                 teachX, teachY = lmList[8][0:2] 
-                middleX, middleY = lmList[12][0:2]
-
-                # Display cursor on both fingers
-                window.blit(cursor, (teachX-25, teachY-40))
-                window.blit(cursor, (middleX-25, middleY-40))
-
+                # Display cursor
+                window.blit(cursor, (teachX-25, teachY-30))
                 # and if the teach finger collides with the back button..
                 if backbtn_rect.collidepoint(teachX, teachY):
-                    distance = detector.findDistance((teachX, teachY), 
-                                                (middleX, middleY))[0]
-                    
-                    if distance < 50:
-                        # Get top 10 names and scores from database
+                    self.counter += 1
+                    if self.counter == 40: # Almost 2 seconds
+                        self.counter = 0
+                        # Update Leaderboard
                         self.names, self.scores = get_leaderboard()
                         # Change to Home Scene
                         self.state = 'home' 
@@ -471,122 +541,25 @@ class SceneManager:
                 
                 # or the teach finger collides with the quit button..
                 elif quitbtn_rect.collidepoint(teachX, teachY):
-                    distance = detector.findDistance((teachX, teachY), 
-                                                (middleX, middleY))[0]
-                    
-                    if distance < 50:
+                    self.counter += 1
+                    if self.counter == 40: # Almost 2 seconds
+                        self.counter = 0
                         # Closes the Game
                         pygame.quit() 
                         sys.exit()
-
-                # Or if hand collides with TextInput Button
-                elif textInput_rect.collidepoint(teachX, teachY):
-                    distance = detector.findDistance((teachX, teachY), 
-                                                (middleX, middleY))[0]
-                    
-                    if distance < 50:
-                        self.clicked = False # To avoid spam clicks on each key
-                        self.finalText = '' # Reset Name
-                        # Change to Name Scene
-                        self.state = 'name'
-
-    def displayNameScreen(self):
-        # Display BG
-        window.blit(endBG, (0,0))
-        # Detect Hand from Webcam
-        _, img = cap.read()
-        img = cv2.flip(img, 1)
-        hands = detector.findHands(img, flipType=False, draw=False)
-
-        # Displaying Text Entry
-        if len(self.finalText) > 8:
-            max = True
-            warning = font2_100.render('Maximum Word Number Reached: 8',
-                                        True, (255,0,0), (255,255,255))
-            window.blit(warning, (100, 500))
-        else:
-            max = False
-
-        pygame.draw.rect(window, (175, 0, 175), (50, 350, 650, 100))
-        nametext = font2_100.render(self.finalText, True, (255, 255, 255))
-        window.blit(nametext, (60, 335))
-        
-        if hands:  
-            hand = hands[0]
-            fingers = detector.fingersUp(hand) 
-            # If teach and middle fingers are raised up..
-            if fingers[1] == 1 and fingers[2] == 1:
-                lmList = hand['lmList']
-                teachX, teachY = lmList[8][0:2]
-                middleX, middleY = lmList[12][0:2]
-
-                # Draw all keyboard buttons
-                # Special for Unused Key
-                x, y, w, h = 950, 150, 85, 85
-                pygame.draw.rect(window, (255, 0, 255), (x, y, w, h))
-                for button in buttonList:
-                    x, y = button.pos
-                    w, h = button.size
-
-                    pygame.draw.rect(window, (255, 0, 255), (x, y, w, h))
-                    letter = font2_50.render(button.text, True, (255, 255, 255))
-                    window.blit(letter, (x + 20, y + 30))
-
-                    # And If button key collides with end of teach finger
-                    if button.getRect().collidepoint(teachX, teachY):
-                        # Display Hover Animation
-                        pygame.draw.rect(window, (175, 0, 175), (x, y, w, h))
-                        letter = font2_50.render(button.text, True, (255, 255, 255))
-                        window.blit(letter, (x + 20, y + 30))
-                        
-                        distance = detector.findDistance((teachX, teachY), (middleX, middleY))[0]
-
-                        # To avoid spam clicks, by checking whether the fingers are apart, after every click
-                        if distance > 50 and self.clicked == True:
-                            self.clicked = False
-
-                        if distance < 50 and self.clicked == False:
-                            self.clicked = True
-                            # Delete last letter if backspace key is clicked
-                            if button.text == 'Backspace':
-                                self.finalText = self.finalText[:-1]
-                            # Go back to home screen if enter key is clicked
-                            elif button.text == 'Enter':
-                                if self.finalText != '':
-                                    # Only Write Name if Entered By user
-                                    # Add user data to csv file
-                                    db = pd.read_csv(database)
-                                    db = db.drop(len(db)-1)
-                                    row = pd.Series({'name': self.finalText, 'score': self.score})
-                                    new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
-                                    new_db.to_csv(database, index=False)
-                                
-                                # Get top 10 names and scores from database
-                                self.names, self.scores = get_leaderboard()
-                                
-                                # Change to Home Scene
-                                self.state = 'home' 
-                                pygame.mixer.stop()
-                                homeMusic.play(-1) 
-                                return
-                            
-                            else:
-                                if not max:
-                                    self.finalText += button.text # Adds Letter
-
-                # Display cursor on both fingers
-                window.blit(cursor, (teachX-25, teachY-40))
-                window.blit(cursor, (middleX-25, middleY-40))
+                
+                else:
+                    self.counter = 0
 
     def state_manager(self):
         if self.state == 'home':    
             self.displayHomeScreen()
+        elif self.state == 'name':
+            self.displayNameScreen()
         elif self.state == 'game':
             self.displayGameScreen()
         elif self.state == 'end':
-            self.displayEndScreen()
-        else: # state is name
-            self.displayNameScreen()
+            self.displayEndScreen()            
 
 scene_manager = SceneManager(duration=10)
 homeMusic.play(-1)
