@@ -1,9 +1,5 @@
-read
-cv2.flip (1)
-findhands with fliptype
-process
-np.rot90
-np.flip (0)
-cvtColor RGB
-pygame makesurface
-blit
+img = np.rot90(img)
+img = np.flip(img, 0)
+img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+frame = pygame.surfarray.make_surface(img)
+window.blit(frame, (0, 0))

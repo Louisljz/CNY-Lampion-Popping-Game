@@ -28,6 +28,9 @@ else:
 # Load Resources
 resources_path = os.path.join(folder_path, 'Resources/')
 database = os.path.join(resources_path, 'database.csv')
+vc_path = os.path.join(resources_path, 'videocapture.txt')
+vc = open(vc_path, 'r')
+vc_no = int(vc.readlines()[0])
 
 bgmusic_path = os.path.join(resources_path, 'BG Music/')
 sfx_path = os.path.join(resources_path, 'SFX/')
@@ -140,12 +143,12 @@ quitbtn_rect.y = 70
 
 
 # Webcam
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(vc_no)
 cap.set(3, width)
 cap.set(4, height)
 
 # Hand Tracking
-detector = HandDetector(maxHands=1, detectionCon=0.6)
+detector = HandDetector(maxHands=1)
 
 # Reset Lampions when out of frame or popped.
 x_points = [100, 300, 500, 700, 900, 1100] # List of possible respawn points
@@ -242,6 +245,16 @@ def write_score(name, score):
     new_db = pd.concat([db, pd.DataFrame([row], columns=row.index)])
     new_db.to_csv(database, index=False)
 
+# Detect Hand from Webcam
+def hand_detector(scale = 0.75):
+    _, img = cap.read()
+    img = cv2.flip(img, 1)
+    img = img[int(height-height*scale) : int(height*scale), 
+            int(width-width*scale) : int(width*scale)] 
+    img = cv2.resize(img, (1280, 720))
+    hands = detector.findHands(img, flipType=False, draw=False)
+    return hands
+
 # Scene Manager
 class SceneManager:
     def __init__(self, duration = 60, initial_speed = 5, increase_speed=0.35):
@@ -273,13 +286,7 @@ class SceneManager:
                                     True, (255,255,0))
             window.blit(text, (825, i * 55 + 300))
         
-        # Detect Hand from Webcam
-        _, img = cap.read()
-        img = img[108:612, 192:1088]
-        cv2.resize(img, (1280, 720))
-        img = cv2.flip(img, 1)
-
-        hands = detector.findHands(img, flipType=False, draw=False)
+        hands = hand_detector()
         
         if hands:
             hand = hands[0]
@@ -306,13 +313,7 @@ class SceneManager:
     def displayNameScreen(self):
         # Display BG
         window.blit(homeBG, (0,0))
-        # Detect Hand from Webcam
-        _, img = cap.read()
-        img = cv2.flip(img, 1)
-        img = img[108:612, 192:1088]
-        cv2.resize(img, (1280, 720))
-
-        hands = detector.findHands(img, flipType=False, draw=False)
+        hands = hand_detector()
 
         # Set Char limit for Name
         if len(self.nameText) > 8:
@@ -385,6 +386,7 @@ class SceneManager:
         splashInfo2 = leaderboard_font.render('Special Merlion Lampion: 10 Points', True, (255,255,255))
         window.blit(splashInfo1, (450, 300))
         window.blit(splashInfo2, (350, 350))
+
         self.splashTime += 1
         if self.splashTime == 100:
             # Reset Variables
@@ -421,13 +423,7 @@ class SceneManager:
             # Display BG
             window.blit(gameBG, (0,0))
             x, y = None, None
-            # Detect Hand from Webcam
-            _, img = cap.read()
-            img = img[108:612, 192:1088]
-            cv2.resize(img, (1280, 720))
-            img = cv2.flip(img, 1)
-
-            hands = detector.findHands(img, flipType=False, draw=False)                
+            hands = hand_detector()             
 
             if hands:
                 hand = hands[0]
@@ -529,13 +525,7 @@ class SceneManager:
         window.blit(finalScore, (300, 350))
         window.blit(message, (350, 275))
 
-        # Detect Hand from Webcam
-        _, img = cap.read()
-        img = img[108:612, 192:1088]
-        cv2.resize(img, (1280, 720))
-        img = cv2.flip(img, 1)
-
-        hands = detector.findHands(img, flipType=False, draw=False)
+        hands = hand_detector()
 
         # If Record broken
         if self.scores.size > 0:
