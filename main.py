@@ -7,7 +7,6 @@ import random
 import os
 import sys
 import pandas as pd
-import numpy as np
 
 # Initialize and Create Window
 pygame.init()
@@ -141,7 +140,7 @@ quitbtn_rect.y = 70
 
 
 # Webcam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 cap.set(3, width)
 cap.set(4, height)
 
@@ -179,7 +178,7 @@ def position_lampions():
     lampion_rect4.x = 880
     lampion_rect4.y = 700
 
-    special_lampion_rect.x = 575
+    special_lampion_rect.x = width
     special_lampion_rect.y = 700
 
 # Keyboard Buttons for Name Scene
@@ -245,7 +244,7 @@ def write_score(name, score):
 
 # Scene Manager
 class SceneManager:
-    def __init__(self, duration = 30, initial_speed = 5, increase_speed=0.35):
+    def __init__(self, duration = 60, initial_speed = 5, increase_speed=0.35):
         self.duration = duration
         self.initial_speed = initial_speed
         self.increase_speed = increase_speed
@@ -276,7 +275,10 @@ class SceneManager:
         
         # Detect Hand from Webcam
         _, img = cap.read()
+        img = img[108:612, 192:1088]
+        cv2.resize(img, (1280, 720))
         img = cv2.flip(img, 1)
+
         hands = detector.findHands(img, flipType=False, draw=False)
         
         if hands:
@@ -307,6 +309,9 @@ class SceneManager:
         # Detect Hand from Webcam
         _, img = cap.read()
         img = cv2.flip(img, 1)
+        img = img[108:612, 192:1088]
+        cv2.resize(img, (1280, 720))
+
         hands = detector.findHands(img, flipType=False, draw=False)
 
         # Set Char limit for Name
@@ -328,6 +333,8 @@ class SceneManager:
         pygame.draw.rect(window, (175, 0, 175), (50, 350, 650, 100))
         nameEntry = font2_100.render(self.nameText, True, (255, 255, 255))
         window.blit(nameEntry, (60, 335))
+
+        drawKeys() # Draw all keyboard buttons
         
         if hands:  
             hand = hands[0]
@@ -337,7 +344,6 @@ class SceneManager:
             if fingers[1] == 1:
                 # Get X, Y coordinate of the end point of teach finger
                 teachX, teachY = lmList[8][0:2] 
-                drawKeys() # Draw all keyboard buttons
                 for button in buttonList:
                     x, y = button.pos
                     w, h = button.size
@@ -358,21 +364,9 @@ class SceneManager:
                             # Enter Game Screen if Enter Key is Clicked
                             elif button.text == 'Enter':
                                 if self.nameText != '':
-                                    # Reset Variables
-                                    self.start = time.time() 
-                                    self.score = 0 
-                                    self.speed = self.initial_speed
-                                    # Reset Initial Position of Lampions
-                                    position_lampions()
-                                    # Reset Curtains' Location
-                                    curtainsLeftRect.x = 0
-                                    curtainsRightRect.x = width - 515
-                                    # Change to Game Scene
-                                    self.state = 'game' 
-                                    pygame.mixer.stop()
-                                    transition.play(0)
-                                    gameMusic.play(-1)
-
+                                    # Change to Splash Scene
+                                    self.state = 'splash'
+                                    self.splashTime = 0
                             else:
                                 if not max:
                                     self.nameText += button.text # Adds Letter
@@ -383,6 +377,33 @@ class SceneManager:
                 
                 # Display cursor
                 window.blit(cursor, (teachX-25, teachY-30))
+
+    def displaySplashScreen(self):
+        window.blit(endBG, (0,0))
+        pygame.draw.rect(window, (162, 25, 25), (300, 250, 700, 200), border_radius=30)
+        splashInfo1 = leaderboard_font.render('Normal Lampion: 5 Points', True, (255,255,255))
+        splashInfo2 = leaderboard_font.render('Special Merlion Lampion: 10 Points', True, (255,255,255))
+        window.blit(splashInfo1, (450, 300))
+        window.blit(splashInfo2, (350, 350))
+        self.splashTime += 1
+        if self.splashTime == 100:
+            # Reset Variables
+            self.start = time.time() 
+            self.score = 0 
+            self.speed = self.initial_speed
+            # Reset Initial Position of Lampions
+            position_lampions()
+            # For Special Lampion Only 
+            # Create Spiral Movement
+            self.right = True
+            # Reset Curtains' Location
+            curtainsLeftRect.x = 0
+            curtainsRightRect.x = width - 515
+            # Change to Game Scene
+            self.state = 'game' 
+            pygame.mixer.stop()
+            transition.play(0)
+            gameMusic.play(-1)
 
     def displayGameScreen(self):
         timeNow = time.time()
@@ -402,7 +423,10 @@ class SceneManager:
             x, y = None, None
             # Detect Hand from Webcam
             _, img = cap.read()
+            img = img[108:612, 192:1088]
+            cv2.resize(img, (1280, 720))
             img = cv2.flip(img, 1)
+
             hands = detector.findHands(img, flipType=False, draw=False)                
 
             if hands:
@@ -423,15 +447,31 @@ class SceneManager:
                                 # Play SFX and animation
                                 boom.play()
                                 window.blit(bonus_pop, (x-100, y-75))
-                                reset_lampions(keyRect, height*4)
-                                self.speed += self.increase_speed
+                                reset_lampions(keyRect, height*2)
+                                # self.speed += self.increase_speed
                                 self.score += 10
                         
-                        if rect.y < 0: # Reset Lampion if it's out of frame
+                        if rect.y < (-rect.height): # Reset Lampion if it's out of frame
                             # So special lampion show up less often
-                            reset_lampions(keyRect, height*4) 
+                            reset_lampions(keyRect, height*2)
 
-                        rect.y -= self.speed
+                        # Create Spiral Movement
+                        if rect.y < height:
+                            if rect.x == 0:
+                                self.right = False
+                            elif rect.x == width-120:
+                                self.right = True
+                            
+                            if self.right:
+                                rect.x -= 10
+                            else:
+                                rect.x += 10
+                            rect.y -= 2
+                        
+                        else:
+                            # When Out of Frame
+                            rect.y -= 10
+                        
                         window.blit(image, rect)
                 
                 else:
@@ -444,7 +484,7 @@ class SceneManager:
                             self.speed += self.increase_speed
                             self.score += 5
                     
-                    if rect.y < 0: # Reset Lampion if it's out of frame
+                    if rect.y < (-rect.height): # Reset Lampion if it's out of frame
                         reset_lampions(keyRect)
                 
                     rect.y -= self.speed
@@ -491,7 +531,10 @@ class SceneManager:
 
         # Detect Hand from Webcam
         _, img = cap.read()
+        img = img[108:612, 192:1088]
+        cv2.resize(img, (1280, 720))
         img = cv2.flip(img, 1)
+
         hands = detector.findHands(img, flipType=False, draw=False)
 
         # If Record broken
@@ -556,12 +599,14 @@ class SceneManager:
             self.displayHomeScreen()
         elif self.state == 'name':
             self.displayNameScreen()
+        elif self.state == 'splash':
+            self.displaySplashScreen()
         elif self.state == 'game':
             self.displayGameScreen()
         elif self.state == 'end':
             self.displayEndScreen()            
 
-scene_manager = SceneManager(duration=10)
+scene_manager = SceneManager()
 homeMusic.play(-1)
 
 # Mainloop  
