@@ -28,9 +28,6 @@ else:
 # Load Resources
 resources_path = os.path.join(folder_path, 'Resources/')
 database = os.path.join(resources_path, 'database.csv')
-vc_path = os.path.join(resources_path, 'videocapture.txt')
-vc = open(vc_path, 'r')
-vc_no = int(vc.readlines()[0])
 
 bgmusic_path = os.path.join(resources_path, 'BG Music/')
 sfx_path = os.path.join(resources_path, 'SFX/')
@@ -143,7 +140,13 @@ quitbtn_rect.y = 70
 
 
 # Webcam
-cap = cv2.VideoCapture(vc_no)
+cap = cv2.VideoCapture(1)
+if cap is None or not cap.isOpened():
+    cap = cv2.VideoCapture(0)
+    print('Using Default Webcam..')
+else:
+    print('Using External Webcam..')
+
 cap.set(3, width)
 cap.set(4, height)
 
@@ -246,7 +249,8 @@ def write_score(name, score):
     new_db.to_csv(database, index=False)
 
 # Detect Hand from Webcam
-def hand_detector(scale = 0.75):
+def hand_detector(scale = 75):
+    scale = scale/100
     _, img = cap.read()
     img = cv2.flip(img, 1)
     img = img[int(height-height*scale) : int(height*scale), 
