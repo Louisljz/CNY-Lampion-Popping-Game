@@ -140,13 +140,7 @@ quitbtn_rect.y = 70
 
 
 # Webcam
-cap = cv2.VideoCapture(1)
-if cap is None or not cap.isOpened():
-    cap = cv2.VideoCapture(0)
-    print('Using Default Webcam..')
-else:
-    print('Using External Webcam..')
-
+cap = cv2.VideoCapture(0)
 cap.set(3, width)
 cap.set(4, height)
 
@@ -261,7 +255,7 @@ def hand_detector(scale = 75):
 
 # Scene Manager
 class SceneManager:
-    def __init__(self, duration = 60, initial_speed = 5, increase_speed=0.35):
+    def __init__(self, duration = 45, initial_speed = 5, increase_speed=0.35):
         self.duration = duration
         self.initial_speed = initial_speed
         self.increase_speed = increase_speed
