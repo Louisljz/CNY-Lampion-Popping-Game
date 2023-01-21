@@ -244,12 +244,12 @@ def write_score(name, score):
 
 # Detect Hand from Webcam
 def hand_detector(scale = 75):
-    scale = scale/100
+    # scale = scale/100
     _, img = cap.read()
     img = cv2.flip(img, 1)
-    img = img[int(height-height*scale) : int(height*scale), 
-            int(width-width*scale) : int(width*scale)] 
-    img = cv2.resize(img, (1280, 720))
+    # img = img[int(height-height*scale) : int(height*scale), 
+    #         int(width-width*scale) : int(width*scale)] 
+    # img = cv2.resize(img, (1280, 720))
     hands = detector.findHands(img, flipType=False, draw=False)
     return hands
 
